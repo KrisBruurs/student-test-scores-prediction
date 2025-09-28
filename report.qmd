@@ -7,4 +7,175 @@ editor: visual
 
 # About the Document
 
-# 
+This document explores a dataset of student exam scores. The goal is to understand key factors influencing exam performance and to build a regression model that predicts exam scores based on study behavior and prior performance. The workflow covers data cleaning, exploratory data analysis (EDA), modeling, diagnostics, and predictive evaluation.
+
+# Libraries
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(table1)
+library(car)
+library(stargazer)
+library(corrplot)
+library(broom)
+library(rsample)
+library(tibble)
+```
+
+# Data Input
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+student_data <- read_csv("data/student_exam_scores.csv")
+```
+
+# Data Checks
+
+-   Are there missing values?
+
+-   Are student IDs unique?
+
+-   What do the summary statistics look like?
+
+```{r}
+colSums(is.na(student_data))
+```
+
+```{r}
+n_distinct(student_data$student_id)
+```
+
+```{r}
+table1(~ hours_studied + sleep_hours + attendance_percent +
+         previous_scores + exam_score, data = student_data)
+```
+
+# Exploratory Data Analysis
+
+## Histograms
+
+*Hours Studied*
+
+```{r}
+student_data %>% 
+  ggplot(aes(x = hours_studied, fill = hours_studied)) +
+  geom_histogram(binwidth = .5, fill = 'steelblue', color = 'black') + 
+  theme_minimal() 
+```
+
+*Sleep Hours*
+
+```{r}
+student_data %>% 
+  ggplot(aes(x = sleep_hours, fill = sleep_hours)) +
+  geom_histogram(binwidth = .3, fill = 'steelblue', color = 'black') + 
+  theme_minimal() 
+```
+
+*Attendance Percentage*
+
+```{r}
+student_data %>% 
+  ggplot(aes(x = attendance_percent, fill = attendance_percent)) +
+  geom_histogram(binwidth = 2.5, fill = 'steelblue', color = 'black') + 
+  theme_minimal() 
+```
+
+*Previous Score*
+
+```{r}
+student_data %>% 
+  ggplot(aes(x = previous_scores, fill = previous_scores)) +
+  geom_histogram(binwidth = 3, fill = 'steelblue', color = 'black') +
+  theme_minimal() 
+```
+
+*Exam Score*
+
+```{r}
+student_data %>% 
+  ggplot(aes(x = exam_score, fill = exam_score)) +
+  geom_histogram(binwidth = 2, fill = 'steelblue', color = 'black') + 
+  theme_minimal() 
+```
+
+## Correlation Matrix
+
+```{r}
+student_data %>% 
+  select(hours_studied, sleep_hours, attendance_percent, previous_scores,
+         exam_score) %>% 
+  cor(use = 'complete.obs') %>% 
+  corrplot(method = 'color', type = 'upper', tl.col = 'black', 
+           addCoef.col = 'black')
+```
+
+# Modeling
+
+## Model Fit
+
+```{r}
+set.seed(123)
+split <- initial_split(student_data, prop = 0.75)
+training_data <- training(split)
+test_data <- testing(split)
+
+model1 <- lm(exam_score ~ hours_studied + sleep_hours + attendance_percent +
+    previous_scores, data = training_data)
+summary(model1)
+```
+
+## Assumption Checks
+
+```{r}
+vif(model1)
+par(mfrow=c(2,2))
+plot(model1)
+```
+
+# Prediction and Evalutation
+
+## Metrics
+
+```{r}
+preds <- predict(model1, newdata = test_data)
+
+results <- tibble(
+  Metric = c("R²", "MAE", "RMSE"),
+  Value  = c(
+    cor(preds, test_data$exam_score)^2,
+    mean(abs(preds - test_data$exam_score)),
+    sqrt(mean((preds - test_data$exam_score)^2))
+  )
+)
+results
+```
+
+## Visual Evalutation
+
+```{r}
+test_data %>%
+  mutate(predicted = preds) %>%
+  ggplot(aes(x = predicted, y = exam_score)) +
+  geom_point(color = "steelblue", alpha = 0.7) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Predicted vs Actual Exam Scores")
+```
+
+```{r}
+test_data %>%
+  mutate(predicted = preds, residuals = exam_score - predicted) %>%
+  ggplot(aes(x = predicted, y = residuals)) +
+  geom_point(color = "darkorange", alpha = 0.7) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Residuals vs Predicted")
+```
+
+# Conclusion
+
+The analysis of student exam scores showed that study habits, prior performance, and class attendance all play meaningful roles in explaining academic outcomes. Among the predictors, **hours studied** had the strongest positive association with exam scores, followed by **previous scores**, which also provided a substantial contribution. Sleep hours and attendance percent had weaker but still relevant effects.
+
+The regression model explained a large proportion of the variance in exam scores, with an **R² of 0.86 on the test set**, and prediction errors averaging only **2–3 points**. Diagnostic checks confirmed that regression assumptions were reasonably satisfied, with no signs of multicollinearity and residuals distributed fairly evenly.
+
+Overall, the model demonstrates both good explanatory power and solid predictive accuracy on unseen data. While linear regression provides a clear and interpretable framework, future improvements could include testing interaction effects (e.g., whether study hours matter more for students with lower prior scores) or experimenting with regularized regression methods to explore model stability.

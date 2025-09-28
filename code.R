@@ -101,6 +101,25 @@ results <- tibble(
     sqrt(mean((preds - test_data$exam_score)^2))
   )
 )
-
 results
 
+test_data %>%
+  mutate(predicted = preds) %>%
+  ggplot(aes(x = predicted, y = exam_score)) +
+  geom_point(color = "steelblue", alpha = 0.7) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Predicted vs Actual Exam Scores",
+       x = "Predicted Exam Score",
+       y = "Actual Exam Score")
+
+test_data %>%
+  mutate(predicted = preds,
+         residuals = exam_score - predicted) %>%
+  ggplot(aes(x = predicted, y = residuals)) +
+  geom_point(color = "darkorange", alpha = 0.7) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Residuals vs Predicted",
+       x = "Predicted Exam Score",
+       y = "Residuals (Actual - Predicted)")
